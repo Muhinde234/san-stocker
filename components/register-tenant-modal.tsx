@@ -58,7 +58,15 @@ function Field({
   );
 }
 
-export function RegisterTenantModal() {
+interface RegisterTenantModalProps {
+  triggerLabel?:     string;
+  triggerClassName?: string;
+}
+
+export function RegisterTenantModal({
+  triggerLabel     = "Register Business",
+  triggerClassName = "inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/25",
+}: RegisterTenantModalProps = {}) {
   const [open, setOpen]               = useState(false);
   const [form, setForm]               = useState<FormState>(INITIAL);
   const [loading, setLoading]         = useState(false);
@@ -95,11 +103,8 @@ export function RegisterTenantModal() {
   return (
     <>
       {/* Trigger button */}
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/25"
-      >
-        Register Business
+      <button onClick={() => setOpen(true)} className={triggerClassName}>
+        {triggerLabel}
       </button>
 
       {/* Modal */}
