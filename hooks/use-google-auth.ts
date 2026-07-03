@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { authService, getUserFromToken, roleToRoute, saveSession } from "@/lib/auth";
+import { authService, getUserFromToken, normalizeTokens, roleToRoute, saveSession } from "@/lib/auth";
 
 export function useGoogleAuth() {
   const router = useRouter();
@@ -11,7 +11,8 @@ export function useGoogleAuth() {
     mutationFn: (idToken: string) => authService.googleSignIn(idToken),
     onSuccess: ({ data }) => {
       saveSession(data);
-      const user = data.user ?? getUserFromToken(data.accessToken);
+      const { accessToken } = normalizeTokens(data);
+      const user = data.user ?? getUserFromToken(accessToken);
       router.push(roleToRoute(user?.role ?? ""));
     },
   });

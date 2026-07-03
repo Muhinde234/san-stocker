@@ -102,6 +102,7 @@ export default function SuperAdminPage() {
           <RefreshCw className="size-4" />
         </button>
         <RegisterTenantModal
+          adminMode
           triggerLabel="+ Register Client"
           triggerClassName="flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#0B1848] shadow-[0_4px_0_#d97706] transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
         />

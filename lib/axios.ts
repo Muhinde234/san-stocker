@@ -4,11 +4,17 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 export const http = axios.create({
   baseURL: "/proxy",           // proxied through Next.js rewrites → no CORS
   headers: { "Content-Type": "application/json" },
-  timeout: 15_000,
+  timeout: 60_000,             // 60 s — accounts for Render free-tier cold starts
 });
 
 // ── token helpers (safe for SSR) ──────────────────────────────────────────────
 const isBrowser = typeof window !== "undefined";
+
+function clearSessionCookies() {
+  if (!isBrowser) return;
+  document.cookie = "san_auth=;path=/;max-age=0";
+  document.cookie = "san_role=;path=/;max-age=0";
+}
 
 export const tokenStore = {
   getAccess:  () => (isBrowser ? localStorage.getItem("san_access_token")  : null),
@@ -21,6 +27,7 @@ export const tokenStore = {
     localStorage.removeItem("san_access_token");
     localStorage.removeItem("san_refresh_token");
     localStorage.removeItem("san_user");
+    clearSessionCookies();
   },
 };
 
@@ -74,11 +81,13 @@ http.interceptors.response.use(
     try {
       const { data } = await axios.post(
         "/proxy/api/v1/auth/refresh",
-        { refreshToken },
+        { refreshToken, refresh_token: refreshToken },
       );
-      tokenStore.set(data.accessToken, data.refreshToken ?? refreshToken);
-      flush(null, data.accessToken);
-      original.headers.Authorization = `Bearer ${data.accessToken}`;
+      const newAccess  = data.accessToken  ?? data.access_token  ?? data.token ?? "";
+      const newRefresh = data.refreshToken ?? data.refresh_token ?? refreshToken;
+      tokenStore.set(newAccess, newRefresh);
+      flush(null, newAccess);
+      original.headers.Authorization = `Bearer ${newAccess}`;
       return http(original);
     } catch (refreshError) {
       flush(refreshError);

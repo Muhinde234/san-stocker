@@ -1,6 +1,10 @@
 import { http } from "./axios";
+import { getRoleLabel, getRoleRoute, isSuperAdmin, ROLE_LABELS, ROLE_ROUTES } from "./rbac";
 
-// ── types ─────────────────────────────────────────────────────────────────────
+export type { PermissionLevel, Role, Module } from "./rbac";
+export { MODULE, ROLE, PERMISSION, canAccessModule, getPermissionLevel } from "./rbac";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 export interface AuthUser {
   id: string;
   firstName?: string;
@@ -11,32 +15,82 @@ export interface AuthUser {
   tenantId?: string | null;
 }
 
+// Backend may return camelCase OR OAuth2 snake_case field names
 export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  user?: AuthUser; // may not be returned by the API — we decode the JWT instead
+  // camelCase
+  accessToken?:  string;
+  refreshToken?: string;
+  // OAuth2 standard snake_case
+  access_token?:  string;
+  refresh_token?: string;
+  // Other common patterns
+  token?: string;
+  user?: AuthUser;
 }
 
-// ── JWT decoder (no library needed) ──────────────────────────────────────────
+// Normalise token fields to a consistent shape
+export function normalizeTokens(data: LoginResponse): { accessToken: string; refreshToken: string } {
+  return {
+    accessToken:  data.accessToken  ?? data.access_token  ?? data.token ?? "",
+    refreshToken: data.refreshToken ?? data.refresh_token ?? "",
+  };
+}
+
+// ── JWT decoder (no library) ──────────────────────────────────────────────────
 export function decodeJwt(token: string): Record<string, unknown> | null {
   try {
-    const payload = token.split(".")[1];
-    if (!payload) return null;
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    // atob requires length % 4 === 0 — add padding if needed
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const json = atob(padded);
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
+function stripRole(raw: string): string {
+  return raw.toUpperCase().replace(/^ROLE_/, "");
+}
+
+function extractRoleFromClaims(claims: Record<string, unknown>): string {
+  // ── 1. Simple string claims ──────────────────────────────────────
+  for (const key of ["role", "roles", "userRole", "user_role", "roleName"]) {
+    const v = claims[key];
+    if (typeof v === "string" && v) return stripRole(v);
+    if (Array.isArray(v) && v.length > 0) return stripRole(String(v[0]));
+  }
+
+  // ── 2. Spring Security authorities / authority ────────────────────
+  // Formats: [{ authority: "ROLE_OWNER" }]  |  ["ROLE_OWNER"]  |  "ROLE_OWNER"
+  const auths = claims.authorities ?? claims.authority;
+  if (Array.isArray(auths) && auths.length > 0) {
+    const first = auths[0];
+    const raw = typeof first === "object" && first !== null
+      ? String((first as { authority?: string }).authority ?? "")
+      : String(first);
+    if (raw) return stripRole(raw);
+  }
+  if (typeof auths === "string" && auths) return stripRole(auths);
+
+  // ── 3. OAuth2 scope string: "ROLE_OWNER read write" ──────────────
+  const scope = claims.scope ?? claims.scp;
+  if (typeof scope === "string") {
+    const roleToken = scope.split(/\s+/).find((t) => /^ROLE_/i.test(t));
+    if (roleToken) return stripRole(roleToken);
+  }
+
+  return "";
+}
+
 export function getUserFromToken(token: string): AuthUser | null {
   const claims = decodeJwt(token);
   if (!claims) return null;
-
-  // common JWT claim shapes — adjust keys to match whatever the API puts in
   return {
     id:        String(claims.sub ?? claims.id ?? claims.userId ?? ""),
-    role:      String(claims.role ?? claims.roles ?? claims.authority ?? ""),
+    role:      extractRoleFromClaims(claims),
     firstName: String(claims.firstName ?? claims.given_name ?? ""),
     lastName:  String(claims.lastName  ?? claims.family_name ?? ""),
     email:     String(claims.email     ?? ""),
@@ -50,48 +104,59 @@ export const authService = {
   login: (identifier: string, password: string) =>
     http.post<LoginResponse>("/api/v1/auth/login", { identifier, password }),
 
-  // Revokes the refresh token on the server (single-use rotation — server issues a new one).
-  // No auth header needed; we send the refresh token in the body.
   logout: (refreshToken: string) =>
-    http.post("/api/v1/auth/logout", { refreshToken }).catch(() => {}),
+    http.post("/api/v1/auth/logout", { refreshToken, refresh_token: refreshToken }).catch(() => {}),
 
   googleSignIn: (idToken: string) =>
     http.post<LoginResponse>("/api/v1/auth/google", { idToken }),
+
+  // Fetch the authenticated user's profile — tried as fallback when JWT extraction fails
+  profile: () => http.get<AuthUser>("/api/v1/users/me").catch(
+    () => http.get<AuthUser>("/api/v1/auth/me")
+  ),
 };
 
-// ── role → initial route ──────────────────────────────────────────────────────
-const ROLE_ROUTES: Record<string, string> = {
-  SUPER_ADMIN:       "/super-admin",
-  SAN_TECH:          "/super-admin",
-  SYSTEM_ADMIN:      "/dashboard",
-  OWNER:             "/dashboard",
-  DIRECTOR:          "/dashboard",
-  STORE_MANAGER:     "/dashboard",
-  BRANCH_MANAGER:    "/dashboard",
-  CASHIER:           "/dashboard/pos",
-  INVENTORY_MANAGER: "/dashboard/inventory",
-  PROCUREMENT:       "/dashboard/purchasing",
-  WAREHOUSE:         "/dashboard/warehouse",
-  ACCOUNTANT:        "/dashboard/finance",
-  HR:                "/dashboard/hr",
-  AUDITOR:           "/dashboard/reports",
-};
+// ── Role helpers (delegated to rbac.ts) ──────────────────────────────────────
+export { getRoleLabel, getRoleRoute, isSuperAdmin, ROLE_LABELS, ROLE_ROUTES };
 
 export function roleToRoute(role: string): string {
-  return ROLE_ROUTES[role?.toUpperCase()] ?? "/dashboard";
+  return getRoleRoute(role);
 }
 
-// ── session helpers ───────────────────────────────────────────────────────────
+// ── Session helpers ───────────────────────────────────────────────────────────
 const isBrowser = typeof window !== "undefined";
+
+// Cookie helpers — read by proxy.ts for server-side route protection
+const COOKIE_MAX_AGE = `max-age=${60 * 60 * 24 * 7}`;
+
+function setAuthCookie() {
+  document.cookie = `san_auth=1;path=/;${COOKIE_MAX_AGE};SameSite=Lax`;
+}
+function clearAuthCookie() {
+  document.cookie = "san_auth=;path=/;max-age=0";
+}
+function setRoleCookie(role: string) {
+  document.cookie = `san_role=${role};path=/;${COOKIE_MAX_AGE};SameSite=Lax`;
+}
+function clearRoleCookie() {
+  document.cookie = "san_role=;path=/;max-age=0";
+}
 
 export function saveSession(data: LoginResponse) {
   if (!isBrowser) return;
-  localStorage.setItem("san_access_token",  data.accessToken);
-  localStorage.setItem("san_refresh_token", data.refreshToken);
+  const { accessToken, refreshToken } = normalizeTokens(data);
 
-  // prefer explicit user from response; fall back to decoding the JWT
-  const user = data.user ?? getUserFromToken(data.accessToken);
-  if (user) localStorage.setItem("san_user", JSON.stringify(user));
+  localStorage.setItem("san_access_token",  accessToken);
+  localStorage.setItem("san_refresh_token", refreshToken);
+
+  // san_auth signals "logged in" to proxy.ts — set unconditionally
+  setAuthCookie();
+
+  const user = data.user ?? getUserFromToken(accessToken);
+  if (user) {
+    localStorage.setItem("san_user", JSON.stringify(user));
+    if (user.role) setRoleCookie(user.role);
+  }
 }
 
 export function getSession(): AuthUser | null {
@@ -99,7 +164,6 @@ export function getSession(): AuthUser | null {
   try {
     const raw = localStorage.getItem("san_user");
     if (raw) return JSON.parse(raw) as AuthUser;
-    // last resort: decode the live token
     const token = localStorage.getItem("san_access_token");
     return token ? getUserFromToken(token) : null;
   } catch {
@@ -112,4 +176,6 @@ export function clearSession() {
   localStorage.removeItem("san_access_token");
   localStorage.removeItem("san_refresh_token");
   localStorage.removeItem("san_user");
+  clearAuthCookie();
+  clearRoleCookie();
 }

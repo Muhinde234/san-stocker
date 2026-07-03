@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
@@ -34,7 +34,6 @@ export function ProfileMenu() {
           <p className="text-xs font-semibold leading-none text-[#1a1d3b]">{fullName}</p>
           <p className="mt-0.5 text-[10px] leading-none text-slate-400">{roleLabel}</p>
         </div>
-        <ChevronDown className="hidden size-3.5 text-slate-400 transition-transform sm:block group-hover:rotate-180" />
       </button>
 
       {/* ── Dropdown ───────────────────────────────────── */}

@@ -4,39 +4,76 @@ import {
   BarChart3,
   Box,
   Crown,
+  DollarSign,
   Headphones,
+  Heart,
   LayoutDashboard,
   LogOut,
   Package,
   Settings,
+  Shield,
+  ShoppingBag,
   ShoppingCart,
+  Tag,
   Truck,
   UserCog,
   Users,
+  Wallet,
   Warehouse,
 } from "lucide-react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authService, clearSession } from "@/lib/auth";
+import { isSuperAdmin, MODULE, type Module } from "@/lib/rbac";
 import { tokenStore } from "@/lib/axios";
 import { useSession } from "@/hooks/use-session";
+import { usePermissions } from "@/hooks/use-permissions";
 
-const nav = [
-  { href: "/dashboard",           icon: LayoutDashboard, label: "Dashboard"  },
-  { href: "/dashboard/products",  icon: Box,             label: "Products"   },
-  { href: "/dashboard/sales",     icon: ShoppingCart,    label: "Sales"      },
-  { href: "/dashboard/customers", icon: Users,           label: "Customers"  },
-  { href: "/dashboard/suppliers", icon: Truck,           label: "Suppliers"  },
-  { href: "/dashboard/inventory", icon: Warehouse,       label: "Inventory"  },
-  { href: "/dashboard/reports",   icon: BarChart3,       label: "Reports"    },
-  { href: "/dashboard/users",     icon: UserCog,         label: "Users"      },
-  { href: "/dashboard/settings",  icon: Settings,        label: "Settings"   },
+type NavItem = {
+  href:   string;
+  icon:   React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label:  string;
+  module: Module;
+};
+
+const NAV: NavItem[] = [
+  { href: "/dashboard",            icon: LayoutDashboard, label: "Dashboard",  module: MODULE.DASHBOARD  },
+  { href: "/dashboard/pos",        icon: ShoppingCart,    label: "POS",        module: MODULE.POS        },
+  { href: "/dashboard/products",   icon: Box,             label: "Products",   module: MODULE.PRODUCTS   },
+  { href: "/dashboard/inventory",  icon: Warehouse,       label: "Inventory",  module: MODULE.INVENTORY  },
+  { href: "/dashboard/purchasing", icon: ShoppingBag,     label: "Purchasing", module: MODULE.PURCHASING },
+  { href: "/dashboard/suppliers",  icon: Truck,           label: "Suppliers",  module: MODULE.SUPPLIERS  },
+  { href: "/dashboard/sales",      icon: BarChart3,       label: "Sales",      module: MODULE.SALES      },
+  { href: "/dashboard/customers",  icon: Users,           label: "Customers",  module: MODULE.CUSTOMERS  },
+  { href: "/dashboard/warehouse",  icon: Package,         label: "Warehouse",  module: MODULE.WAREHOUSE  },
+  { href: "/dashboard/delivery",   icon: Truck,           label: "Delivery",   module: MODULE.DELIVERY   },
+  { href: "/dashboard/financials", icon: DollarSign,      label: "Financials", module: MODULE.FINANCIALS },
+  { href: "/dashboard/loyalty",    icon: Heart,           label: "Loyalty",    module: MODULE.LOYALTY    },
+  { href: "/dashboard/promotions", icon: Tag,             label: "Promotions", module: MODULE.PROMOTIONS },
+  { href: "/dashboard/hr",         icon: Users,           label: "HR",         module: MODULE.HR         },
+  { href: "/dashboard/payroll",    icon: Wallet,          label: "Payroll",    module: MODULE.PAYROLL    },
+  { href: "/dashboard/reports",    icon: BarChart3,       label: "Reports",    module: MODULE.REPORTS    },
+  { href: "/dashboard/users",      icon: UserCog,         label: "Users",      module: MODULE.USERS      },
+  { href: "/dashboard/audit",      icon: Shield,          label: "Audit Logs", module: MODULE.AUDIT_LOGS },
+  { href: "/dashboard/settings",   icon: Settings,        label: "Settings",   module: MODULE.SETTINGS   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const path   = usePathname();
   const router = useRouter();
-  const { roleLabel } = useSession();
+  const { user, initials, fullName, roleLabel } = useSession();
+  const { canAccess } = usePermissions();
+
+  // Super admins belong in /super-admin, not here
+  useEffect(() => {
+    if (user && isSuperAdmin(user.role)) {
+      router.replace("/super-admin");
+    }
+  }, [user, router]);
+
+  // Only show nav items the current user's role can access
+  const visibleNav = NAV.filter((item) => canAccess(item.module));
 
   async function handleLogout() {
     const refreshToken = tokenStore.getRefresh();
@@ -60,13 +97,14 @@ export function Sidebar() {
       </div>
 
       {/* ── Navigation ─────────────────────────────────── */}
-      <nav className="flex flex-col gap-0.5 px-3 pt-2">
-        {nav.map(({ href, icon: Icon, label }) => {
+      <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 pt-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
+        {visibleNav.map(({ href, icon: Icon, label }) => {
           const active = path === href || (href !== "/dashboard" && path.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all duration-150 ${
                 active
                   ? "bg-[#4264FB] text-white shadow-[0_4px_16px_rgba(66,100,251,0.35)]"
@@ -74,9 +112,7 @@ export function Sidebar() {
               }`}
             >
               <Icon
-                className={`size-4.5 shrink-0 transition-colors ${
-                  active ? "text-white" : "text-white/40"
-                }`}
+                className={`size-4.5 shrink-0 transition-colors ${active ? "text-white" : "text-white/40"}`}
                 strokeWidth={active ? 2.2 : 1.7}
               />
               {label}
@@ -85,12 +121,10 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* ── Spacer ─────────────────────────────────────── */}
       <div className="flex-1" />
 
       {/* ── Plan card ──────────────────────────────────── */}
       <div className="mx-3 mb-2 rounded-2xl bg-white/5 p-4 ring-1 ring-white/8">
-        {/* Crown + title + badge */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Crown className="size-4 text-amber-400" strokeWidth={1.8} />
@@ -100,17 +134,21 @@ export function Sidebar() {
             Premium
           </span>
         </div>
-
-        {/* Renewal date */}
         <p className="mt-2 text-[11px] leading-snug text-white/45">
           Your plan renews on{" "}
           <span className="font-semibold text-white/70">24 Dec 2025</span>
         </p>
-
-        {/* Upgrade button */}
-        <button className="mt-3 w-full rounded-xl bg-[#4264FB] py-2 text-[12px] font-bold text-white shadow-[0_3px_10px_rgba(66,100,251,0.40)] transition-colors hover:bg-[#3555e0] active:scale-[0.98]">
-          Upgrade Plan
-        </button>
+        <div className="mt-2 border-t border-white/8 pt-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-full bg-[#4264FB] text-[10px] font-bold text-white">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-semibold text-white">{fullName}</p>
+              <p className="truncate text-[10px] text-white/40">{roleLabel}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── Help & Support ─────────────────────────────── */}
@@ -137,7 +175,7 @@ export function Sidebar() {
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold text-white/50 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400"
         >
-          <LogOut className="size-4.5 shrink-0 text-white/40 transition-colors hover:text-red-400" strokeWidth={1.7} />
+          <LogOut className="size-4.5 shrink-0 text-white/40 transition-colors" strokeWidth={1.7} />
           Logout
         </button>
       </div>
