@@ -1,4 +1,4 @@
-import { Camera, Laptop, Smartphone } from "lucide-react";
+import { BarChart3, Box, Camera, Laptop, Package, ShoppingBag, ShoppingCart, Smartphone, Users } from "lucide-react";
 
 const customers = [
   { initials: "JM", bg: "bg-[#4264FB]",    name: "James Mwangi",  detail: "42 yrs • 145 purchases",  date: "31 May, 2025" },
@@ -27,6 +27,15 @@ const stockItems = [
   },
 ];
 
+const quickActions = [
+  { icon: Box,          label: "Add Product",      iconBg: "bg-blue-50",    iconColor: "text-[#4264FB]"   },
+  { icon: ShoppingCart, label: "New Sale",          iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+  { icon: Users,        label: "Add Customer",      iconBg: "bg-purple-50",  iconColor: "text-purple-600"  },
+  { icon: ShoppingBag,  label: "Create Purchase",   iconBg: "bg-amber-50",   iconColor: "text-amber-600"   },
+  { icon: BarChart3,    label: "View Reports",      iconBg: "bg-sky-50",     iconColor: "text-sky-600"     },
+  { icon: Package,      label: "Stock Adjustment",  iconBg: "bg-rose-50",    iconColor: "text-rose-600"    },
+];
+
 const CARD = "rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#E4E8F4]";
 
 export function RecentCustomers() {
@@ -48,6 +57,27 @@ export function RecentCustomers() {
             </div>
             <span className="shrink-0 text-[10px] text-slate-400">{date}</span>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function QuickActions() {
+  return (
+    <div className={CARD}>
+      <p className="mb-4 text-sm font-bold text-[#1a1d3b]">Quick Actions</p>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        {quickActions.map(({ icon: Icon, label, iconBg, iconColor }) => (
+          <button
+            key={label}
+            className="group flex flex-col items-center gap-2 rounded-2xl border border-[#E4E8F4] bg-[#F8F9FF] px-3 py-4 text-center transition-all hover:border-[#4264FB]/30 hover:bg-[#EEF1FF] hover:shadow-[0_2px_12px_rgba(66,100,251,0.10)]"
+          >
+            <div className={`flex size-10 items-center justify-center rounded-xl ${iconBg} transition-transform group-hover:scale-110`}>
+              <Icon className={`size-4.5 ${iconColor}`} />
+            </div>
+            <span className="text-[10px] font-medium leading-tight text-slate-500">{label}</span>
+          </button>
         ))}
       </div>
     </div>

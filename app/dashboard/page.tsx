@@ -3,7 +3,7 @@ import { Bell, Mail, Search } from "lucide-react";
 import { Sidebar } from "@/components/dash/sidebar";
 import { StatCards } from "@/components/dash/stat-cards";
 import { SalesTrendChart, TodaysOrders } from "@/components/dash/charts";
-import { RecentCustomers, StockHealth } from "@/components/dash/bottom-sections";
+import { QuickActions, RecentCustomers, StockHealth } from "@/components/dash/bottom-sections";
 
 export default function DashboardPage() {
   return (
@@ -67,6 +67,9 @@ export default function DashboardPage() {
             <RecentCustomers />
             <StockHealth />
           </div>
+
+          {/* Quick actions */}
+          <QuickActions />
         </div>
       </main>
     </div>
