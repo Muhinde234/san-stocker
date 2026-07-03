@@ -21,7 +21,6 @@ export function HomeNav() {
 
       {/* Right actions */}
       <div className="flex items-center gap-3">
-       
         <Link
           href="/login"
           className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
