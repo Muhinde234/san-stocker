@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 // ── instance ──────────────────────────────────────────────────────────────────
 export const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: "/proxy",           // proxied through Next.js rewrites → no CORS
   headers: { "Content-Type": "application/json" },
   timeout: 15_000,
 });
@@ -73,7 +73,7 @@ http.interceptors.response.use(
 
     try {
       const { data } = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`,
+        "/proxy/api/v1/auth/refresh",
         { refreshToken },
       );
       tokenStore.set(data.accessToken, data.refreshToken ?? refreshToken);

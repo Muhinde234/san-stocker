@@ -50,8 +50,13 @@ export const authService = {
   login: (identifier: string, password: string) =>
     http.post<LoginResponse>("/api/v1/auth/login", { identifier, password }),
 
-  logout: () =>
-    http.post("/api/v1/auth/logout").catch(() => {}),
+  // Revokes the refresh token on the server (single-use rotation — server issues a new one).
+  // No auth header needed; we send the refresh token in the body.
+  logout: (refreshToken: string) =>
+    http.post("/api/v1/auth/logout", { refreshToken }).catch(() => {}),
+
+  googleSignIn: (idToken: string) =>
+    http.post<LoginResponse>("/api/v1/auth/google", { idToken }),
 };
 
 // ── role → initial route ──────────────────────────────────────────────────────

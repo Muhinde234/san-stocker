@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { clearSession } from "@/lib/auth";
+import { authService, clearSession } from "@/lib/auth";
+import { tokenStore } from "@/lib/axios";
 
 const nav = [
   { href: "/super-admin",               icon: LayoutDashboard, label: "Overview"      },
@@ -27,7 +28,9 @@ export function SuperAdminSidebar() {
   const path   = usePathname();
   const router = useRouter();
 
-  function handleLogout() {
+  async function handleLogout() {
+    const refreshToken = tokenStore.getRefresh();
+    if (refreshToken) await authService.logout(refreshToken);
     clearSession();
     router.push("/login");
   }

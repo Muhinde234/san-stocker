@@ -1,8 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
-if (!BASE_URL) {
-  throw new Error("NEXT_PUBLIC_API_URL is not set. Add it to .env.local");
-}
+// Use the local proxy so all requests go through Next.js rewrites (avoids CORS).
+const BASE_URL = "/proxy";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
