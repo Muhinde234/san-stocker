@@ -1,56 +1,107 @@
 "use client";
 
-import { Bell, RefreshCw, Search } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
-import { RegisterTenantModal } from "@/components/register-tenant-modal";
 import { SuperAdminStatCards } from "@/components/super-admin/stat-cards";
 import { ClientTable, type Tenant } from "@/components/super-admin/client-table";
+import { api } from "@/lib/api";
 
-// ── placeholder data — replace with API fetch when endpoints are ready ─────────
-const MOCK_TENANTS: Tenant[] = [
-  {
-    id: "1",
-    name: "Kigali Fresh Mart",
-    email: "info@kigalifresh.rw",
-    phone: "0788 123 456",
-    address: "KN 4 Ave, Kigali",
-    subscriptionStatus: "TRIALING",
-    plan: "Starter",
-    createdAt: "2025-05-01T08:00:00Z",
-    branchCount: 1,
-    userCount: 4,
-  },
-  {
-    id: "2",
-    name: "Muhanga Supermarket",
-    email: "admin@muhangamart.rw",
-    phone: "0722 987 654",
-    address: "Southern Province, Rwanda",
-    subscriptionStatus: "ACTIVE",
-    plan: "Business",
-    createdAt: "2025-03-15T10:30:00Z",
-    branchCount: 3,
-    userCount: 18,
-  },
-  {
-    id: "3",
-    name: "Vision Electronics",
-    email: "shop@visionrw.com",
-    phone: "0700 456 789",
-    address: "Remera, Kigali",
-    subscriptionStatus: "SUSPENDED",
-    plan: "Business",
-    createdAt: "2025-01-20T09:00:00Z",
-    branchCount: 2,
-    userCount: 9,
-  },
-];
+type TenantsResponse = Tenant[] | { data?: Tenant[]; items?: Tenant[]; results?: Tenant[] };
+
+function extractTenants(payload: TenantsResponse | null | undefined): Tenant[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload) return [];
+
+  const candidates = [
+    payload.data,
+    payload.items,
+    payload.results,
+    (payload as { content?: Tenant[] }).content,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function normalizeStatus(status: string | undefined): Tenant["subscriptionStatus"] {
+  switch ((status ?? "").toUpperCase()) {
+    case "ACTIVE":
+      return "ACTIVE";
+    case "TRIALING":
+      return "TRIALING";
+    case "SUSPENDED":
+      return "SUSPENDED";
+    case "EXPIRED":
+      return "EXPIRED";
+    case "CANCELLED":
+    case "CANCELED":
+      return "CANCELLED";
+    default:
+      return "TRIALING";
+  }
+}
+
+function mapTenant(raw: Record<string, unknown>): Tenant {
+  const createdAt = String(raw.createdAt ?? raw.created_at ?? raw.createdOn ?? new Date().toISOString());
+
+  return {
+    id: String(raw.id ?? raw._id ?? raw.tenantId ?? raw.tenant_id ?? raw.uuid ?? crypto.randomUUID()),
+    name: String(raw.name ?? raw.businessName ?? raw.tenantName ?? "Unnamed business"),
+    email: String(raw.email ?? raw.businessEmail ?? raw.contactEmail ?? ""),
+    phone: String(raw.phone ?? raw.businessPhone ?? raw.contactPhone ?? ""),
+    address: String(raw.address ?? raw.location ?? raw.businessAddress ?? ""),
+    subscriptionStatus: normalizeStatus(String(raw.subscriptionStatus ?? raw.subscriptionStatusName ?? raw.status ?? "")),
+    plan: String(raw.plan ?? raw.subscriptionPlan ?? raw.subscription?.plan ?? ""),
+    createdAt,
+    branchCount: Number(raw.branchCount ?? raw.branchesCount ?? raw.branches ?? 1),
+    userCount: Number(raw.userCount ?? raw.usersCount ?? raw.users ?? 0),
+  };
+}
+
+function toTenantList(payload: TenantsResponse | null | undefined): Tenant[] {
+  return extractTenants(payload).map((item) => mapTenant(item as Record<string, unknown>));
+}
 
 export default function SuperAdminPage() {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const pageSize = 5;
 
-  const tenants = MOCK_TENANTS;
+  const loadTenants = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await api.get<TenantsResponse>("/api/v1/tenants", {
+        query: {
+          page: 1,
+          limit: 100,
+          search: search.trim() || undefined,
+        },
+      });
+      setTenants(toTenantList(data));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load tenants.");
+      setTenants([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadTenants();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadTenants]);
 
   const stats = {
     total:     tenants.length,
@@ -65,29 +116,22 @@ export default function SuperAdminPage() {
       t.email.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleTenants = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   return (
     <main className="flex-1 overflow-y-auto">
 
-      {/* Header */}
-      <div className="flex items-start justify-between px-8 pb-4 pt-8">
-        <div>
-          <h1 className="text-xl font-extrabold text-[#1a1d3b]">SAN TECH — Client Overview</h1>
-          <p className="mt-0.5 text-sm text-slate-400">
-            Manage all client businesses and their subscriptions.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button className="relative flex size-9 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-[#E4E8F4]">
-            <Bell className="size-4 text-slate-500" />
-            <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-red-500" />
-          </button>
-          <div className="flex size-9 items-center justify-center rounded-full bg-amber-400 text-sm font-bold text-[#0B1848]">
-            SA
-          </div>
-        </div>
+      {/* Page title */}
+      <div className="px-8 pb-4 pt-8">
+        <h1 className="text-xl font-extrabold text-[#1a1d3b]">Client Overview</h1>
+        <p className="mt-0.5 text-sm text-slate-400">
+          Manage all client businesses and their subscriptions.
+        </p>
       </div>
 
-      {/* Search + Register */}
+      {/* Search */}
       <div className="flex items-center gap-3 px-8 pb-6">
         <div className="flex flex-1 items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#E4E8F4]">
           <Search className="size-4 shrink-0 text-slate-400" />
@@ -101,14 +145,15 @@ export default function SuperAdminPage() {
         <button className="flex size-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-[#E4E8F4] text-slate-500 hover:text-[#4264FB] transition-colors">
           <RefreshCw className="size-4" />
         </button>
-        <RegisterTenantModal
-          adminMode
-          triggerLabel="+ Register Client"
-          triggerClassName="flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#0B1848] shadow-[0_4px_0_#d97706] transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
-        />
       </div>
 
       <div className="space-y-5 px-8 pb-10">
+        {error && (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Stats */}
         <SuperAdminStatCards {...stats} />
 
@@ -120,7 +165,14 @@ export default function SuperAdminPage() {
               {filtered.length} total
             </span>
           </div>
-          <ClientTable tenants={filtered} />
+          {loading ? (
+            <div className="px-6 py-16 text-center text-sm text-slate-400">Loading tenants…</div>
+          ) : (
+          <ClientTable
+            tenants={visibleTenants}
+            pagination={{ currentPage: safePage, totalPages, onPageChange: setPage }}
+          />
+          )}
         </div>
       </div>
     </main>

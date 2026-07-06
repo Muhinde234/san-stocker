@@ -1,5 +1,5 @@
 import { http } from "./axios";
-import { getRoleLabel, getRoleRoute, isSuperAdmin, ROLE_LABELS, ROLE_ROUTES } from "./rbac";
+import { getRoleLabel, getRoleRoute, isSuperAdmin, normalizeRole, ROLE_LABELS, ROLE_ROUTES } from "./rbac";
 
 export type { PermissionLevel, Role, Module } from "./rbac";
 export { MODULE, ROLE, PERMISSION, canAccessModule, getPermissionLevel } from "./rbac";
@@ -28,11 +28,40 @@ export interface LoginResponse {
   user?: AuthUser;
 }
 
+export function resolveLoginPayload(data: LoginResponse): LoginResponse | null {
+  const seen = new Set<unknown>();
+
+  const visit = (value: unknown): LoginResponse | null => {
+    if (!value || typeof value !== "object" || seen.has(value)) return null;
+    seen.add(value);
+
+    const record = value as Record<string, unknown>;
+    const directToken = record.accessToken ?? record.access_token ?? record.token;
+    const directRefresh = record.refreshToken ?? record.refresh_token;
+    const hasUser = Boolean(record.user);
+
+    if (directToken || directRefresh || hasUser) {
+      return record as LoginResponse;
+    }
+
+    for (const key of ["data", "result", "payload", "body"]) {
+      const nested = visit(record[key]);
+      if (nested) return nested;
+    }
+
+    return null;
+  };
+
+  return visit(data);
+}
+
 // Normalise token fields to a consistent shape
 export function normalizeTokens(data: LoginResponse): { accessToken: string; refreshToken: string } {
+  const payload = resolveLoginPayload(data) ?? data;
+
   return {
-    accessToken:  data.accessToken  ?? data.access_token  ?? data.token ?? "",
-    refreshToken: data.refreshToken ?? data.refresh_token ?? "",
+    accessToken:  payload.accessToken  ?? payload.access_token  ?? payload.token ?? "",
+    refreshToken: payload.refreshToken ?? payload.refresh_token ?? "",
   };
 }
 
@@ -52,7 +81,7 @@ export function decodeJwt(token: string): Record<string, unknown> | null {
 }
 
 function stripRole(raw: string): string {
-  return raw.toUpperCase().replace(/^ROLE_/, "");
+  return normalizeRole(raw);
 }
 
 function extractRoleFromClaims(claims: Record<string, unknown>): string {
@@ -117,7 +146,7 @@ export const authService = {
 };
 
 // ── Role helpers (delegated to rbac.ts) ──────────────────────────────────────
-export { getRoleLabel, getRoleRoute, isSuperAdmin, ROLE_LABELS, ROLE_ROUTES };
+export { getRoleLabel, getRoleRoute, isSuperAdmin, normalizeRole, ROLE_LABELS, ROLE_ROUTES };
 
 export function roleToRoute(role: string): string {
   return getRoleRoute(role);
@@ -144,18 +173,20 @@ function clearRoleCookie() {
 
 export function saveSession(data: LoginResponse) {
   if (!isBrowser) return;
-  const { accessToken, refreshToken } = normalizeTokens(data);
+  const payload = resolveLoginPayload(data) ?? data;
+  const { accessToken, refreshToken } = normalizeTokens(payload);
 
   localStorage.setItem("san_access_token",  accessToken);
+  localStorage.setItem("accessToken", accessToken);
   localStorage.setItem("san_refresh_token", refreshToken);
 
   // san_auth signals "logged in" to proxy.ts — set unconditionally
   setAuthCookie();
 
-  const user = data.user ?? getUserFromToken(accessToken);
+  const user = payload.user ?? getUserFromToken(accessToken);
   if (user) {
     localStorage.setItem("san_user", JSON.stringify(user));
-    if (user.role) setRoleCookie(user.role);
+    if (user.role) setRoleCookie(normalizeRole(user.role));
   }
 }
 
@@ -164,7 +195,7 @@ export function getSession(): AuthUser | null {
   try {
     const raw = localStorage.getItem("san_user");
     if (raw) return JSON.parse(raw) as AuthUser;
-    const token = localStorage.getItem("san_access_token");
+    const token = localStorage.getItem("san_access_token") ?? localStorage.getItem("accessToken");
     return token ? getUserFromToken(token) : null;
   } catch {
     return null;
@@ -174,6 +205,7 @@ export function getSession(): AuthUser | null {
 export function clearSession() {
   if (!isBrowser) return;
   localStorage.removeItem("san_access_token");
+  localStorage.removeItem("accessToken");
   localStorage.removeItem("san_refresh_token");
   localStorage.removeItem("san_user");
   clearAuthCookie();

@@ -6,7 +6,6 @@ import {
   CreditCard,
   LayoutDashboard,
   LogOut,
-  PlusCircle,
   Settings,
   Shield,
   ShieldCheck,
@@ -17,7 +16,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authService, clearSession } from "@/lib/auth";
 import { tokenStore } from "@/lib/axios";
-import { RegisterTenantModal } from "@/components/register-tenant-modal";
 import { useSession } from "@/hooks/use-session";
 
 const NAV_SECTIONS = [
@@ -114,20 +112,6 @@ export function SuperAdminSidebar({ onClose }: { onClose?: () => void } = {}) {
         ))}
       </nav>
 
-      {/* Register Business */}
-      <div className="mx-3 mb-3">
-        <RegisterTenantModal
-          adminMode
-          triggerLabel={
-            <span className="flex items-center gap-2">
-              <PlusCircle className="size-4" />
-              Register Business
-            </span>
-          }
-          triggerClassName="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-400 py-2.5 text-[13px] font-bold text-[#0B1848] shadow-[0_3px_10px_rgba(251,191,36,0.40)] transition-all hover:bg-amber-300 active:scale-[0.98]"
-        />
-      </div>
-
       {/* Profile + Logout */}
       <div className="m-3 rounded-2xl bg-white/6 p-3.5 ring-1 ring-white/8">
         <div className="flex items-center gap-3">
@@ -138,14 +122,15 @@ export function SuperAdminSidebar({ onClose }: { onClose?: () => void } = {}) {
             <p className="truncate text-xs font-semibold text-white">{fullName || "SAN TECH Admin"}</p>
             <p className="truncate text-[10px] text-white/50">Super Administrator</p>
           </div>
-          <button
-            onClick={handleLogout}
-            title="Logout"
-            className="text-white/35 transition-colors hover:text-red-400"
-          >
-            <LogOut className="size-3.5" />
-          </button>
         </div>
+
+        <button
+          onClick={handleLogout}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/8 px-3 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-red-500/15 hover:text-red-300"
+        >
+          <LogOut className="size-4" />
+          Logout
+        </button>
       </div>
 
     </aside>

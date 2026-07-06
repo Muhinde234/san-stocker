@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Search, UserPlus, Users } from "lucide-react";
 
+import { Pagination } from "@/components/ui/pagination";
+
 interface CustomerRow {
   id:        string;
   name:      string;
@@ -36,6 +38,8 @@ function fmtRwf(n: number) {
 export default function SuperAdminCustomersPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"" | "ACTIVE" | "INACTIVE">("");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
   const filtered = MOCK_CUSTOMERS.filter((c) => {
     const matchSearch =
@@ -45,6 +49,10 @@ export default function SuperAdminCustomersPage() {
     const matchStatus = !filter || c.status === filter;
     return matchSearch && matchStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleCustomers = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const totalPurchases = MOCK_CUSTOMERS.reduce((s, c) => s + c.purchases, 0);
   const totalRevenue   = MOCK_CUSTOMERS.reduce((s, c) => s + c.totalSpent, 0);
@@ -133,14 +141,14 @@ export default function SuperAdminCustomersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {visibleCustomers.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-400">
                       No customers match your search.
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((c) => (
+                  visibleCustomers.map((c) => (
                     <tr key={c.id} className="border-b border-[#F4F6FB] transition-colors hover:bg-[#F8FAFF]">
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-3">
@@ -169,6 +177,7 @@ export default function SuperAdminCustomersPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} />
         </div>
       </div>
     </main>

@@ -74,6 +74,31 @@ export const MODULE = {
 
 export type Module = typeof MODULE[keyof typeof MODULE];
 
+const ROLE_ALIASES: Record<string, string> = {
+  "SUPER ADMIN": ROLE.SUPER_ADMIN,
+  "SUPER ADMINISTRATOR": ROLE.SUPER_ADMIN,
+  "SAN TECH": ROLE.SAN_TECH,
+  "SAN TECH ADMIN": ROLE.SAN_TECH,
+  "SYSTEM ADMINISTRATOR": ROLE.SYSTEM_ADMIN,
+  "OWNER / DIRECTOR": ROLE.OWNER,
+  "OWNER DIRECTOR": ROLE.OWNER,
+};
+
+export function normalizeRole(role: string): string {
+  const trimmed = role?.trim();
+  if (!trimmed) return "";
+
+  const upper = trimmed.toUpperCase();
+  const alias = ROLE_ALIASES[upper];
+  if (alias) return alias;
+
+  return upper
+    .replace(/^ROLE_/, "")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 // ── Role → Permission Level ───────────────────────────────────────────────────
 export const ROLE_PERMISSION: Record<string, PermissionLevel> = {
   SUPER_ADMIN:         PERMISSION.SUPER_ADMIN,
@@ -301,25 +326,25 @@ export const ROLE_ROUTES: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export function getPermissionLevel(role: string): PermissionLevel {
-  return ROLE_PERMISSION[role?.toUpperCase()] ?? PERMISSION.READ_ONLY;
+  return ROLE_PERMISSION[normalizeRole(role)] ?? PERMISSION.READ_ONLY;
 }
 
 export function canAccessModule(role: string, module: Module): boolean {
-  const r = role?.toUpperCase();
+  const r = normalizeRole(role);
   // System admins always have full access within their tenant
   if (r === ROLE.SYSTEM_ADMIN) return true;
   return (ROLE_MODULES[r] ?? []).includes(module);
 }
 
 export function getRoleLabel(role: string): string {
-  return ROLE_LABELS[role?.toUpperCase()] ?? role ?? "User";
+  return ROLE_LABELS[normalizeRole(role)] ?? role ?? "User";
 }
 
 export function getRoleRoute(role: string): string {
-  return ROLE_ROUTES[role?.toUpperCase()] ?? "/dashboard";
+  return ROLE_ROUTES[normalizeRole(role)] ?? "/dashboard";
 }
 
 export function isSuperAdmin(role: string): boolean {
-  const r = role?.toUpperCase();
+  const r = normalizeRole(role);
   return r === ROLE.SUPER_ADMIN || r === ROLE.SAN_TECH;
 }

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Shield, UserCog, UserPlus } from "lucide-react";
+import { Search, UserCog, UserPlus } from "lucide-react";
+
+import { Pagination } from "@/components/ui/pagination";
 
 interface UserRow {
   id:        string;
@@ -46,6 +48,8 @@ const FILTERS: Array<{ label: string; value: string }> = [
 export default function SuperAdminUsersPage() {
   const [search,  setSearch]  = useState("");
   const [roleFilter, setRole] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
   const filtered = MOCK_USERS.filter((u) => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -58,6 +62,10 @@ export default function SuperAdminUsersPage() {
         : u.role === roleFilter;
     return matchSearch && matchRole;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleUsers = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <main className="flex-1 overflow-y-auto">
@@ -143,14 +151,14 @@ export default function SuperAdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {visibleUsers.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
                       No users match your search.
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((u) => (
+                  visibleUsers.map((u) => (
                     <tr key={u.id} className="border-b border-[#F4F6FB] transition-colors hover:bg-[#F8FAFF]">
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-3">
@@ -197,6 +205,7 @@ export default function SuperAdminUsersPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} />
         </div>
       </div>
     </main>

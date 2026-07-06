@@ -81,6 +81,7 @@ interface RegisterTenantModalProps {
   triggerClassName?: string;
   adminMode?:        boolean;
   onSuccess?:        () => void;
+  onBeforeOpen?:     () => void;   // called just before the modal opens (e.g. close a drawer)
 }
 
 export function RegisterTenantModal({
@@ -88,6 +89,7 @@ export function RegisterTenantModal({
   triggerClassName = "inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/25",
   adminMode        = false,
   onSuccess,
+  onBeforeOpen,
 }: RegisterTenantModalProps = {}) {
   const [open, setOpen]           = useState(false);
   const [form, setForm]           = useState<FormState>(INITIAL);
@@ -113,7 +115,11 @@ export function RegisterTenantModal({
     setLoading(true);
     setError("");
     try {
-      await api.post("/api/v1/auth/register-tenant", form);
+      const payload = adminMode
+        ? { ...form, subscriptionPlan: "STANDARD" }
+        : form;
+
+      await api.post(adminMode ? "/api/v1/tenants" : "/api/v1/auth/register-tenant", payload);
       setSuccess(true);
       if (adminMode) onSuccess?.();
     } catch (err) {
@@ -125,12 +131,12 @@ export function RegisterTenantModal({
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className={triggerClassName}>
+      <button onClick={() => { onBeforeOpen?.(); setOpen(true); }} className={triggerClassName}>
         {triggerLabel}
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
 
           {/* Backdrop */}
           <div
@@ -158,7 +164,7 @@ export function RegisterTenantModal({
                 </p>
                 <p className="mt-2 text-[13px] leading-relaxed text-white/55">
                   {adminMode
-                    ? "Onboard a new business onto the SAN Stocker platform."
+                    ? "Create a tenant, its main branch, default roles, and the first owner/admin user."
                     : "Get your business running in minutes — no credit card needed."}
                 </p>
 
@@ -167,7 +173,7 @@ export function RegisterTenantModal({
                   {(adminMode
                     ? [
                         { icon: Zap,        text: "30-day TRIALING subscription created automatically" },
-                        { icon: BadgeCheck,  text: "Owner account provisioned instantly" },
+                        { icon: BadgeCheck,  text: "First owner/admin account provisioned instantly" },
                         { icon: ShieldCheck, text: "Full platform access from day one" },
                       ]
                     : [
@@ -208,7 +214,7 @@ export function RegisterTenantModal({
                   </p>
                 </div>
                 <p className="hidden text-sm font-extrabold text-[#1a1d3b] sm:block">
-                  {adminMode ? "Client Details" : "Business & Owner Details"}
+                  {adminMode ? "Tenant Details" : "Business & Owner Details"}
                 </p>
                 <button
                   onClick={close}
@@ -232,7 +238,7 @@ export function RegisterTenantModal({
                       </p>
                       <p className="mt-2 text-sm leading-relaxed text-slate-400">
                         {adminMode
-                          ? "The business has been onboarded with a TRIALING subscription. They can log in immediately."
+                          ? "The tenant has been onboarded with a TRIALING subscription, and the first owner/admin can log in immediately."
                           : "Your business has been registered. Sign in to get started."}
                       </p>
                     </div>
@@ -333,8 +339,8 @@ export function RegisterTenantModal({
                           <User className="size-4 text-[#4264FB]" />
                         </div>
                         <div>
-                          <p className="text-[13px] font-bold text-[#1a1d3b]">Owner Account</p>
-                          <p className="text-[11px] text-slate-400">Primary administrator of this business</p>
+                          <p className="text-[13px] font-bold text-[#1a1d3b]">Owner / Admin Account</p>
+                          <p className="text-[11px] text-slate-400">Primary administrator for this tenant</p>
                         </div>
                       </div>
 

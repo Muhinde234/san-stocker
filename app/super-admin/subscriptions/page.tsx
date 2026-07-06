@@ -11,6 +11,8 @@ import {
   Zap,
 } from "lucide-react";
 
+import { Pagination } from "@/components/ui/pagination";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Status = "ALL" | "ACTIVE" | "TRIALING" | "SUSPENDED" | "EXPIRED";
 type Plan   = "Starter" | "Business" | "Enterprise";
@@ -47,6 +49,14 @@ const CLIENTS: Client[] = [
     id: "5", name: "Nyamata Agro Shop",     email: "nyamata@agro.rw",
     status: "EXPIRED",   plan: "Starter",    renewsAt: null,          seats: 2,
   },
+  {
+    id: "6", name: "Kayonza Market",        email: "admin@kayonza.market",
+    status: "ACTIVE",    plan: "Business",   renewsAt: "2026-07-15", seats: 14,
+  },
+  {
+    id: "7", name: "Rubavu Wholesale",     email: "hello@rubavumarket.rw",
+    status: "TRIALING",  plan: "Starter",    renewsAt: null,          seats: 5,
+  },
 ];
 
 const PLANS: Plan[] = ["Starter", "Business", "Enterprise"];
@@ -78,6 +88,8 @@ export default function SubscriptionsPage() {
   const [search, setSearch]   = useState("");
   const [filter, setFilter]   = useState<Status>("ALL");
   const [clients, setClients] = useState<Client[]>(CLIENTS);
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
   const filtered = clients.filter((c) => {
     const matchesStatus = filter === "ALL" || c.status === filter;
@@ -85,6 +97,10 @@ export default function SubscriptionsPage() {
     const matchesSearch = !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
     return matchesStatus && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleClients = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function changePlan(id: string, plan: Plan) {
     setClients((prev) => prev.map((c) => c.id === id ? { ...c, plan } : c));
@@ -182,7 +198,7 @@ export default function SubscriptionsPage() {
             </span>
           </div>
 
-          {filtered.length === 0 ? (
+                {visibleClients.length === 0 ? (
             <div className="py-16 text-center text-sm text-slate-400">No clients match this filter.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -195,7 +211,7 @@ export default function SubscriptionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((c) => {
+                  {visibleClients.map((c) => {
                     const meta = STATUS_META[c.status];
                     return (
                       <tr
@@ -276,6 +292,7 @@ export default function SubscriptionsPage() {
               </table>
             </div>
           )}
+          <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} />
         </div>
       </div>
     </main>

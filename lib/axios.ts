@@ -17,14 +17,16 @@ function clearSessionCookies() {
 }
 
 export const tokenStore = {
-  getAccess:  () => (isBrowser ? localStorage.getItem("san_access_token")  : null),
+  getAccess:  () => (isBrowser ? (localStorage.getItem("san_access_token") ?? localStorage.getItem("accessToken")) : null),
   getRefresh: () => (isBrowser ? localStorage.getItem("san_refresh_token") : null),
   set: (access: string, refresh: string) => {
     localStorage.setItem("san_access_token",  access);
+    localStorage.setItem("accessToken", access);
     localStorage.setItem("san_refresh_token", refresh);
   },
   clear: () => {
     localStorage.removeItem("san_access_token");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("san_refresh_token");
     localStorage.removeItem("san_user");
     clearSessionCookies();

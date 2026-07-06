@@ -1,6 +1,7 @@
 "use client";
 
-import { Building2, Eye, MoreHorizontal, ShieldOff, Zap } from "lucide-react";
+import { Building2, CreditCard, Eye, PencilLine, ShieldOff, Zap } from "lucide-react";
+import { Pagination } from "@/components/ui/pagination";
 
 export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
 
@@ -36,11 +37,18 @@ function StatusBadge({ status }: { status: SubscriptionStatus }) {
 interface Props {
   tenants: Tenant[];
   onView?:    (t: Tenant) => void;
+  onEdit?:    (t: Tenant) => void;
+  onSubscription?: (t: Tenant) => void;
   onActivate?: (t: Tenant) => void;
   onSuspend?:  (t: Tenant) => void;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
-export function ClientTable({ tenants, onView, onActivate, onSuspend }: Props) {
+export function ClientTable({ tenants, onView, onEdit, onSubscription, onActivate, onSuspend, pagination }: Props) {
   if (tenants.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
@@ -54,6 +62,7 @@ export function ClientTable({ tenants, onView, onActivate, onSuspend }: Props) {
   }
 
   return (
+    <>
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
@@ -143,10 +152,27 @@ export function ClientTable({ tenants, onView, onActivate, onSuspend }: Props) {
                   )}
 
                   <button
+                    onClick={() => onEdit?.(t)}
+                    title="Edit client"
+                    className="flex size-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#F4F6FC] hover:text-slate-600"
+                  >
+                    <PencilLine className="size-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => onSubscription?.(t)}
+                    title="Subscription"
+                    className="flex size-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#EEF1FF] hover:text-[#4264FB]"
+                  >
+                    <CreditCard className="size-3.5" />
+                  </button>
+
+                  <button
                     title="More"
                     className="flex size-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[#F4F6FC] hover:text-slate-600"
                   >
-                    <MoreHorizontal className="size-3.5" />
+                    <span className="sr-only">More actions</span>
+                    <span className="text-[11px] leading-none">⋯</span>
                   </button>
                 </div>
               </td>
@@ -155,5 +181,13 @@ export function ClientTable({ tenants, onView, onActivate, onSuspend }: Props) {
         </tbody>
       </table>
     </div>
+    {pagination && (
+      <Pagination
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.onPageChange}
+      />
+    )}
+    </>
   );
 }
