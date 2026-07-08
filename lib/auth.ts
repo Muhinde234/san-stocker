@@ -1,5 +1,5 @@
 import { http } from "./axios";
-import { getRoleLabel, getRoleRoute, isSuperAdmin, normalizeRole, ROLE_LABELS, ROLE_ROUTES } from "./rbac";
+import { getRoleLabel, getRoleRoute, isSuperAdmin, normalizeRole, ROLE, ROLE_LABELS, ROLE_ROUTES } from "./rbac";
 
 export type { PermissionLevel, Role, Module } from "./rbac";
 export { MODULE, ROLE, PERMISSION, canAccessModule, getPermissionLevel } from "./rbac";
@@ -13,6 +13,15 @@ export interface AuthUser {
   phone?: string;
   role: string;
   tenantId?: string | null;
+  isSuperAdmin?: boolean;
+}
+
+// Platform super admins can have roleId=null and no role name at all —
+// the backend signals them with a flat `isSuperAdmin` boolean instead.
+export function resolveRole(user: { role?: unknown; isSuperAdmin?: unknown } | null | undefined): string {
+  if (!user) return "";
+  if (user.isSuperAdmin) return ROLE.SUPER_ADMIN;
+  return typeof user.role === "string" ? user.role : "";
 }
 
 // Backend may return camelCase OR OAuth2 snake_case field names
@@ -183,10 +192,12 @@ export function saveSession(data: LoginResponse) {
   // san_auth signals "logged in" to proxy.ts — set unconditionally
   setAuthCookie();
 
-  const user = payload.user ?? getUserFromToken(accessToken);
-  if (user) {
+  const rawUser = payload.user ?? getUserFromToken(accessToken);
+  if (rawUser) {
+    const role = resolveRole(rawUser);
+    const user = role ? { ...rawUser, role } : rawUser;
     localStorage.setItem("san_user", JSON.stringify(user));
-    if (user.role) setRoleCookie(normalizeRole(user.role));
+    if (role) setRoleCookie(normalizeRole(role));
   }
 }
 
@@ -194,7 +205,11 @@ export function getSession(): AuthUser | null {
   if (!isBrowser) return null;
   try {
     const raw = localStorage.getItem("san_user");
-    if (raw) return JSON.parse(raw) as AuthUser;
+    if (raw) {
+      const user = JSON.parse(raw) as AuthUser;
+      const role = resolveRole(user);
+      return role && role !== user.role ? { ...user, role } : user;
+    }
     const token = localStorage.getItem("san_access_token") ?? localStorage.getItem("accessToken");
     return token ? getUserFromToken(token) : null;
   } catch {

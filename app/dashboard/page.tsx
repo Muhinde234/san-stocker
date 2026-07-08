@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, Mail, Menu, Search } from "lucide-react";
 
 import { Sidebar } from "@/components/dash/sidebar";
@@ -8,52 +8,11 @@ import { ProfileMenu } from "@/components/dash/profile-menu";
 import { StatCards } from "@/components/dash/stat-cards";
 import { SalesTrendChart, TodaysOrders } from "@/components/dash/charts";
 import { QuickActions, RecentCustomers, StockHealth } from "@/components/dash/bottom-sections";
-import { decodeJwt } from "@/lib/auth";
-import { isSuperAdmin } from "@/lib/rbac";
-import { useRouter } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
 
 export default function DashboardPage() {
   const [navOpen, setNavOpen] = useState(false);
-  const router = useRouter();
   const { greeting, fullName, initials } = useSession();
-
-  // Catch super admins that slipped through (JWT had no role claim)
-  useEffect(() => {
-    const token = localStorage.getItem("san_access_token") ?? "";
-    const rawUser = localStorage.getItem("san_user");
-
-    console.log("[san-stocker] dashboard — stored JWT claims:", decodeJwt(token));
-    console.log("[san-stocker] dashboard — stored user:", rawUser);
-
-    // If role is already known and is super-admin, redirect immediately
-    try {
-      const user = rawUser ? (JSON.parse(rawUser) as { role?: string }) : null;
-      if (user?.role && isSuperAdmin(user.role)) {
-        router.replace("/super-admin");
-        return;
-      }
-      // Role known and not super-admin → stay on dashboard
-      if (user?.role) return;
-    } catch { /* malformed JSON */ }
-
-    // Role unknown — ask the profile endpoint (native fetch, no axios interceptors)
-    if (!token) return;
-    fetch("/proxy/api/v1/users/me", {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(5_000),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-      .then((profile: { role?: string; [k: string]: unknown } | null) => {
-        if (!profile?.role) return;
-        console.log("[san-stocker] dashboard — profile role:", profile.role);
-        const u = { id: String(profile.id ?? ""), role: profile.role };
-        localStorage.setItem("san_user", JSON.stringify(u));
-        document.cookie = `san_role=${profile.role};path=/;max-age=${60 * 60 * 24 * 7};SameSite=Lax`;
-        if (isSuperAdmin(profile.role)) router.replace("/super-admin");
-      });
-  }, [router]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F0F4FF]">

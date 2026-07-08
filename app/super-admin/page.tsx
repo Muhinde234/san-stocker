@@ -7,9 +7,10 @@ import { SuperAdminStatCards } from "@/components/super-admin/stat-cards";
 import { ClientTable, type Tenant } from "@/components/super-admin/client-table";
 import { api } from "@/lib/api";
 
-type TenantsResponse = Tenant[] | { data?: Tenant[]; items?: Tenant[]; results?: Tenant[] };
+type RawTenant = Record<string, unknown>;
+type TenantsResponse = RawTenant[] | { data?: RawTenant[]; items?: RawTenant[]; results?: RawTenant[] };
 
-function extractTenants(payload: TenantsResponse | null | undefined): Tenant[] {
+function extractTenants(payload: TenantsResponse | null | undefined): RawTenant[] {
   if (Array.isArray(payload)) return payload;
   if (!payload) return [];
 
@@ -17,7 +18,7 @@ function extractTenants(payload: TenantsResponse | null | undefined): Tenant[] {
     payload.data,
     payload.items,
     payload.results,
-    (payload as { content?: Tenant[] }).content,
+    (payload as { content?: RawTenant[] }).content,
   ];
 
   for (const candidate of candidates) {
@@ -45,8 +46,9 @@ function normalizeStatus(status: string | undefined): Tenant["subscriptionStatus
   }
 }
 
-function mapTenant(raw: Record<string, unknown>): Tenant {
+function mapTenant(raw: RawTenant): Tenant {
   const createdAt = String(raw.createdAt ?? raw.created_at ?? raw.createdOn ?? new Date().toISOString());
+  const subscription = raw.subscription as { plan?: string } | undefined;
 
   return {
     id: String(raw.id ?? raw._id ?? raw.tenantId ?? raw.tenant_id ?? raw.uuid ?? crypto.randomUUID()),
@@ -55,7 +57,7 @@ function mapTenant(raw: Record<string, unknown>): Tenant {
     phone: String(raw.phone ?? raw.businessPhone ?? raw.contactPhone ?? ""),
     address: String(raw.address ?? raw.location ?? raw.businessAddress ?? ""),
     subscriptionStatus: normalizeStatus(String(raw.subscriptionStatus ?? raw.subscriptionStatusName ?? raw.status ?? "")),
-    plan: String(raw.plan ?? raw.subscriptionPlan ?? raw.subscription?.plan ?? ""),
+    plan: String(raw.plan ?? raw.subscriptionPlan ?? subscription?.plan ?? ""),
     createdAt,
     branchCount: Number(raw.branchCount ?? raw.branchesCount ?? raw.branches ?? 1),
     userCount: Number(raw.userCount ?? raw.usersCount ?? raw.users ?? 0),
@@ -63,7 +65,7 @@ function mapTenant(raw: Record<string, unknown>): Tenant {
 }
 
 function toTenantList(payload: TenantsResponse | null | undefined): Tenant[] {
-  return extractTenants(payload).map((item) => mapTenant(item as Record<string, unknown>));
+  return extractTenants(payload).map(mapTenant);
 }
 
 export default function SuperAdminPage() {

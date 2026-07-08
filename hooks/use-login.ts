@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 
 import {
   authService,
-  decodeJwt,
   getUserFromToken,
   normalizeTokens,
   normalizeRole,
   resolveLoginPayload,
+  resolveRole,
   roleToRoute,
   saveSession,
 } from "@/lib/auth";
@@ -30,15 +30,10 @@ export function useLogin() {
       const payload = resolveLoginPayload(data) ?? data;
       const { accessToken } = normalizeTokens(payload);
 
-      console.log("[san-stocker] login response keys:", Object.keys(data));
-      console.log("[san-stocker] accessToken (first 40):", accessToken.slice(0, 40) || "(empty — wrong field name)");
-      console.log("[san-stocker] JWT claims:", decodeJwt(accessToken));
-
       saveSession(data);
 
       const user = payload.user ?? getUserFromToken(accessToken);
-      let role = normalizeRole(user?.role ?? "");
-      console.log("[san-stocker] JWT role:", role || "(empty — trying profile endpoint)");
+      let role = normalizeRole(resolveRole(user));
 
       if (!role && accessToken) {
         try {
@@ -47,16 +42,16 @@ export function useLogin() {
             signal: AbortSignal.timeout(5_000),
           });
           if (resp.ok) {
-            const profile = (await resp.json()) as { role?: string; [k: string]: unknown };
-            role = normalizeRole(profile?.role ?? "");
+            const profile = (await resp.json()) as { role?: string; isSuperAdmin?: boolean; [k: string]: unknown };
+            role = normalizeRole(resolveRole(profile));
             if (role) {
-              saveSession({ ...payload, user: { ...(user ?? {}), role, id: user?.id ?? "" } });
+              const id = user?.id ?? String(profile.id ?? "");
+              saveSession({ ...payload, user: { ...(user ?? {}), ...profile, id, role } });
             }
           }
         } catch {
           // profile endpoint unavailable — navigate without role
         }
-        console.log("[san-stocker] profile role:", role || "(still empty)");
       }
 
       router.push(role ? roleToRoute(role) : "/dashboard");

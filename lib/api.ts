@@ -57,7 +57,15 @@ async function request<T>(path: string, options: RequestOptions & { query?: Quer
     throw new Error(message);
   }
 
-  return res.json() as Promise<T>;
+  const json = await res.json();
+
+  // Backend wraps every successful response as { success, data, ... } — unwrap
+  // transparently so callers work with the actual payload, not the envelope.
+  if (json && typeof json === "object" && "success" in json && "data" in json) {
+    return json.data as T;
+  }
+
+  return json as T;
 }
 
 export const api = {
